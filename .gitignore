@@ -1,0 +1,11 @@
+node_modules/
+
+# Private settings and passwords - never commit these.
+.env
+.env.*
+!.env.example
+database-setup.sql
+
+npm-debug.log*
+.DS_Store
+Thumbs.db
