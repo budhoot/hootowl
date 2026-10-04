@@ -1,6 +1,23 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { workerStatus } from './recovery/heartbeat.js';
 import { adminRouter, HttpError } from './routes/admin.js';
 import { twilioRouter } from './routes/twilio.js';
+
+const dashboardDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'dashboard');
+
+// The dashboard only loads its own files and only talks to this API.
+function dashboardSecurityHeaders(req, res, next) {
+  res.set({
+    'Content-Security-Policy':
+      "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'X-Frame-Options': 'DENY',
+  });
+  next();
+}
 
 export function createApp({ pool, config, logger = console }) {
   const app = express();
@@ -9,9 +26,12 @@ export function createApp({ pool, config, logger = console }) {
   app.set('trust proxy', true);
 
   app.get('/health', async (req, res) => {
-    await pool.query('SELECT 1');
-    res.json({ ok: true });
+    const worker = await workerStatus(pool, config);
+    res.json({ ok: true, worker_online: worker.online });
   });
+
+  app.get('/', (req, res) => res.redirect('/dashboard/'));
+  app.use('/dashboard', dashboardSecurityHeaders, express.static(dashboardDir));
 
   app.use('/webhooks/twilio', twilioRouter({ pool, config }));
   app.use('/admin', adminRouter({ pool, config }));

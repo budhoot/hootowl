@@ -8,7 +8,7 @@ let ctx;
 before(async () => { ctx = await setup(); });
 after(async () => { await ctx.close(); });
 beforeEach(async () => {
-  await ctx.pool.query('TRUNCATE clients, calls, recovery_queue, inbound_messages, opt_outs, sms_status_events RESTART IDENTITY CASCADE');
+  await ctx.pool.query('TRUNCATE clients, calls, recovery_queue, inbound_messages, opt_outs, sms_status_events, worker_heartbeats RESTART IDENTITY CASCADE');
 });
 
 test('all four Twilio webhooks reject unsigned or wrongly signed requests', async () => {

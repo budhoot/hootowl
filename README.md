@@ -112,33 +112,47 @@ Expected output: `Applied migration 001_initial.sql` then `Database is up to dat
 The **Auth Token** is a password too: it lets someone send texts on your account. Keep it only in
 `.env`.
 
-## 6. Run it
+## 6. Run it: desktop shortcut (easiest)
 
-You need **three PowerShell windows**, each `cd`'d into the `hootowl` folder.
-
-**Window 1: public address for Twilio**
+Create a **HootOwl Dashboard** shortcut, with the owl icon, on your desktop. Run this once:
 
 ```powershell
-ngrok http 3000
+npm run shortcut
 ```
 
-Copy the `https://….ngrok-free.app` address it shows. Put it in `.env` as `PUBLIC_BASE_URL=`
-(no trailing `/`). Free ngrok addresses change each time you restart ngrok, so update `.env`
-and Twilio when that happens.
+From now on, **double-click the HootOwl Dashboard icon** on your desktop. It:
 
-**Window 2: the API**
+1. starts the API and the recovery worker if they aren't already running. They appear as minimized
+   windows called **HootOwl API** and **HootOwl Worker** on your taskbar.
+2. opens the dashboard in your web browser.
+
+To stop HootOwl, close those two taskbar windows. If you move the `hootowl` folder, run
+`npm run shortcut` again.
+
+**ngrok (so Twilio can reach your computer).** ngrok gives every free account one **fixed domain**.
+Find it in the ngrok dashboard under **Domains**, e.g. `owl-example.ngrok-free.app`. In `.env` set:
+
+```
+NGROK_DOMAIN=owl-example.ngrok-free.app
+PUBLIC_BASE_URL=https://owl-example.ngrok-free.app
+```
+
+The shortcut then starts ngrok too (as a **HootOwl ngrok** window), and the address never changes,
+so you only set it in Twilio once. The first time you use ngrok, connect it to your account:
+`ngrok config add-authtoken <your token from the ngrok dashboard>`.
+
+### Running by hand instead
+
+You can also run each part in its own PowerShell window (each `cd`'d into `hootowl`):
 
 ```powershell
-npm start
+ngrok http --url=owl-example.ngrok-free.app 3000   # window 1: public address for Twilio
+npm start                                          # window 2: the API + dashboard
+npm run worker                                     # window 3: sends the recovery texts
 ```
 
-**Window 3: the recovery worker**
-
-```powershell
-npm run worker
-```
-
-To stop either one, click its window and press **Ctrl + C**.
+Then open **http://localhost:3000/dashboard/** in your browser. To stop one, click its window and
+press **Ctrl + C**.
 
 ## 7. Point your Twilio number at the API
 
@@ -154,9 +168,31 @@ because the API gives Twilio those addresses itself.
 > registration** in the Twilio console (Messaging → Regulatory Compliance). Unregistered texts are
 > blocked by carriers.
 
-## 8. Add a client (admin API)
+## 8. Use the dashboard
 
-`$key` must be your `ADMIN_API_KEY` from `.env`. In PowerShell:
+Sign in with the `ADMIN_API_KEY` from your `.env` file (`notepad .env`, copy the value after `=`).
+Tick **Remember on this computer** to stay signed in. Only do that on your own computer.
+
+| Page | What you do there |
+| --- | --- |
+| **Overview** | Missed calls, texts sent, replies, answer rate, and anything needing attention. A banner warns you if the worker is offline. |
+| **Lead inbox** | Every missed call: the text we sent, whether it was delivered, and the caller's replies. Click a phone number to call back. |
+| **Clients** | Add businesses, turn recovery texts on/off, and open **Manage** to change the business phone, booking link, custom text (with a live preview) and Twilio numbers. |
+| **Needs attention** | Texts whose outcome is unknown or that Twilio refused. Check the Twilio console, then choose **It was sent**, **Don't send**, or **Send it / Try again**. |
+
+The **All clients** menu at the top filters every page to one business. The **Texting on / offline**
+light shows whether the recovery worker is running.
+
+**Add your first client:** go to **Clients → Add client**, then enter the business name, the Twilio
+number callers will dial, and the business's real phone. You can type phone numbers any way you
+like, e.g. `(512) 555-0100`. Then call the Twilio number from your mobile and **don't answer**
+the business phone. Within a few seconds you should get the recovery text, and the call appears
+in the **Lead inbox**.
+
+### Doing the same from PowerShell (optional)
+
+Everything in the dashboard is also available from the admin API. `$key` must be your
+`ADMIN_API_KEY` from `.env`:
 
 ```powershell
 $key = (Select-String -Path .env -Pattern '^ADMIN_API_KEY=(.*)$').Matches[0].Groups[1].Value
@@ -169,18 +205,10 @@ $body = @{
 } | ConvertTo-Json -Depth 5
 
 Invoke-RestMethod -Method Post -Uri http://localhost:3000/admin/clients -Headers $headers -ContentType "application/json" -Body $body
-```
-
-- `twilio_number`: the Twilio number callers dial.
-- `forward_to_number`: the business's real phone.
-- Phone numbers must be in **E.164** format: `+`, country code, number, no spaces (`+15551230000`).
-
-Now call the Twilio number from your mobile and **don't answer** the business phone. Within a few
-seconds you should get the recovery text. To see the lead:
-
-```powershell
 Invoke-RestMethod -Uri http://localhost:3000/admin/inbox -Headers $headers | ConvertTo-Json -Depth 6
 ```
+
+The API expects phone numbers in **E.164** format: `+`, country code, number, no spaces (`+15551230000`).
 
 ### Admin API reference
 
@@ -199,9 +227,10 @@ Every request needs the header `Authorization: Bearer <ADMIN_API_KEY>`. Bodies a
 | `PATCH /admin/routes/:id` | Change `forward_to_number` or `active` (inactive = "not in service") |
 | `GET /admin/inbox?client_id=&limit=&offset=` | **Lead inbox**: missed calls + recovery text status + caller replies |
 | `GET /admin/replies?client_id=` | All texts callers sent in |
+| `GET /admin/stats?client_id=` | Dashboard numbers (missed calls, texts, replies, items needing attention) and whether the worker is online |
 | `GET /admin/recovery?status=needs_review` | Recovery queue, filterable by status |
 | `POST /admin/recovery/:id/resolve` | Settle a `needs_review`/`failed` item: `{"status": "sent"}` (it did go out), `"failed"` (it didn't), or `"pending"` (try again) |
-| `GET /health` | Returns `{"ok": true}` when the API can reach the database (no key needed) |
+| `GET /health` | `{"ok": true, "worker_online": true}` when the API can reach the database (no key needed) |
 
 **Custom text:** set `recovery_message` on a client, e.g.
 `"Thanks for calling {business_name}! Book here: {booking_url}"`. "Reply STOP to opt out." is
@@ -220,7 +249,7 @@ in step 4, and `TEST_DATABASE_URL` in `.env` points at it.
 npm test
 ```
 
-You should see `# pass 20` and `# fail 0`. No real calls or texts are made, because the tests use
+You should see `# fail 0`. No real calls or texts are made, because the tests use
 a fake Twilio.
 
 ## Deploying to production
@@ -229,7 +258,9 @@ Run the API (`npm start`) and the worker (`npm run worker`) as **two separate se
 Node host (Render, Railway, Fly.io, a VPS, …) with a managed PostgreSQL. On the host, set the same
 variables as `.env` (the host's dashboard has an "Environment variables" page), with
 `PUBLIC_BASE_URL` set to the API's https address, e.g. `https://api.hootowl.net`. Both programs
-create and update the database tables automatically when they start. The worker can be offline for
+create and update the database tables automatically when they start. The dashboard is then at
+`https://api.hootowl.net/dashboard/`. Point your desktop shortcut there with
+`npm run shortcut -- -Url https://api.hootowl.net/dashboard/`. The worker can be offline for
 a while: missed calls wait in the queue until it comes back.
 
 ## Troubleshooting
@@ -241,14 +272,18 @@ a while: missed calls wait in the queue until it comes back.
 | `ECONNREFUSED … 5432` | PostgreSQL isn't running. Open **Services** (Windows key → "Services") and start **postgresql-x64-16**. |
 | Twilio says *"an application error has occurred"* | Check the API window for errors. In the Twilio console, open **Monitor → Logs → Errors**. |
 | Twilio error **11200** / API returns **403** | The signature check failed. Usually `PUBLIC_BASE_URL` doesn't exactly match the address in the Twilio console (http vs https, old ngrok address, trailing `/`), or the Auth Token is wrong. |
-| Call forwards, but no text | Is the worker running? Check `GET /admin/inbox` for `recovery_status` and `skip_reason`. |
+| Call forwards, but no text | Is the dashboard light **Texting offline**? Start the worker. Otherwise the call's card in the **Lead inbox** says why it wasn't texted. |
+| Double-clicking the shortcut does nothing | Open PowerShell in `hootowl` and run `powershell -ExecutionPolicy Bypass -File scripts\start-hootowl.ps1` to see the error message. |
+| Dashboard says *"Cannot reach the HootOwl API"* | The API window was closed. Double-click the shortcut again. |
 | `EADDRINUSE :3000` | The API is already running in another window. Close it, or set `PORT=3001` in `.env`. |
 
 ## Project layout
 
 ```
+public/dashboard/        the operator dashboard (HTML, CSS, JavaScript, logo)
+assets/hootowl.ico       owl icon for the desktop shortcut
 src/
-  server.js              starts the API
+  server.js              starts the API (and serves the dashboard)
   worker.js              starts the recovery worker
   app.js                 Express app: routes + error handling
   config.js              reads and checks settings from .env
@@ -260,8 +295,11 @@ src/
   recovery/worker.js     claim → check → send → save logic
   recovery/message.js    builds the recovery text
   recovery/deliveryStatus.js  applies Twilio delivery updates
-migrations/001_initial.sql    database tables
+  recovery/heartbeat.js  lets the dashboard know the worker is running
+migrations/                   database tables
 scripts/setup-env.js          creates .env with random passwords
+scripts/create-desktop-shortcut.ps1   npm run shortcut
+scripts/start-hootowl.ps1     what the desktop shortcut runs
 test/                         automated tests (npm test)
 ```
 

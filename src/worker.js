@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
 import { migrate } from './migrate.js';
+import { recordHeartbeat, removeHeartbeat } from './recovery/heartbeat.js';
 import { processNext, sweepStuckSends } from './recovery/worker.js';
 
 const config = loadConfig();
@@ -19,14 +20,17 @@ process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
 
 await migrate(pool);
+// Forget workers that stopped without cleaning up (e.g. the computer was switched off).
+await pool.query(`DELETE FROM worker_heartbeats WHERE last_seen < now() - interval '1 day'`);
 console.log(`Recovery worker started (checking every ${config.worker.pollIntervalMs} ms)`);
 
 while (running) {
   try {
+    await recordHeartbeat(pool);
     await sweepStuckSends({ pool, config });
     // Drain the queue, then wait before checking again.
     while (running && (await processNext({ pool, sendSms, config }))) {
-      // keep going
+      await recordHeartbeat(pool);
     }
   } catch (err) {
     console.error('Worker loop error:', err);
@@ -34,5 +38,6 @@ while (running) {
   if (running) await sleep(config.worker.pollIntervalMs);
 }
 
+await removeHeartbeat(pool).catch(() => {});
 await pool.end();
 console.log('Worker stopped.');

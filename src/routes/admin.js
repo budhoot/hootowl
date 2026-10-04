@@ -2,6 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import { withTransaction } from '../db.js';
 import { isE164 } from '../phone.js';
+import { workerStatus } from '../recovery/heartbeat.js';
+import { buildRecoveryMessage } from '../recovery/message.js';
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -104,6 +106,11 @@ const CLIENT_SELECT = `
          COALESCE((SELECT json_agg(r ORDER BY r.id) FROM phone_routes r WHERE r.client_id = c.id), '[]') AS routes
     FROM clients c`;
 
+// Adds the exact text a caller would receive, so the dashboard can show it.
+function withPreview(client) {
+  return { ...client, recovery_preview: buildRecoveryMessage(client) };
+}
+
 export function adminRouter({ pool, config }) {
   const router = express.Router();
   router.use(requireAdminKey(config.adminApiKey));
@@ -112,7 +119,7 @@ export function adminRouter({ pool, config }) {
   async function getClient(db, clientId) {
     const { rows } = await db.query(`${CLIENT_SELECT} WHERE c.id = $1`, [clientId]);
     if (!rows[0]) throw new HttpError(404, 'Client not found');
-    return rows[0];
+    return withPreview(rows[0]);
   }
 
   async function insertRoute(db, clientId, body) {
@@ -133,7 +140,7 @@ export function adminRouter({ pool, config }) {
 
   router.get('/clients', async (req, res) => {
     const { rows } = await pool.query(`${CLIENT_SELECT} ORDER BY c.id`);
-    res.json({ clients: rows });
+    res.json({ clients: rows.map(withPreview) });
   });
 
   router.post('/clients', async (req, res) => {
@@ -210,6 +217,38 @@ export function adminRouter({ pool, config }) {
     );
     if (!rows[0]) throw new HttpError(404, 'Route not found');
     res.json({ route: rows[0] });
+  });
+
+  // ---- dashboard numbers ----
+
+  router.get('/stats', async (req, res) => {
+    const clientId = optionalClientId(req.query);
+    const { rows } = await pool.query(
+      `SELECT
+         (SELECT count(*) FROM calls
+           WHERE missed AND created_at > now() - interval '24 hours'
+             AND ($1::bigint IS NULL OR client_id = $1)) AS missed_calls_24h,
+         (SELECT count(*) FROM calls
+           WHERE missed AND created_at > now() - interval '7 days'
+             AND ($1::bigint IS NULL OR client_id = $1)) AS missed_calls_7d,
+         (SELECT count(*) FROM calls
+           WHERE created_at > now() - interval '7 days'
+             AND ($1::bigint IS NULL OR client_id = $1)) AS calls_7d,
+         (SELECT count(*) FROM recovery_queue
+           WHERE status = 'sent' AND sent_at > now() - interval '7 days'
+             AND ($1::bigint IS NULL OR client_id = $1)) AS texts_sent_7d,
+         (SELECT count(*) FROM inbound_messages
+           WHERE keyword IS NULL AND created_at > now() - interval '7 days'
+             AND ($1::bigint IS NULL OR client_id = $1)) AS replies_7d,
+         (SELECT count(*) FROM recovery_queue
+           WHERE status IN ('needs_review', 'failed')
+             AND ($1::bigint IS NULL OR client_id = $1)) AS needs_attention,
+         (SELECT count(*) FROM recovery_queue
+           WHERE status = 'pending'
+             AND ($1::bigint IS NULL OR client_id = $1)) AS queued`,
+      [clientId],
+    );
+    res.json({ stats: rows[0], worker: await workerStatus(pool, config) });
   });
 
   // ---- lead inbox ----

@@ -31,6 +31,7 @@ export async function setup() {
 
   return {
     pool,
+    baseUrl,
     // Sends a form POST signed exactly like Twilio would sign it.
     async twilioPost(path, params, { signature } = {}) {
       const sig = signature ?? twilio.getExpectedTwilioSignature(
