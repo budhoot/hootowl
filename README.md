@@ -129,6 +129,20 @@ From now on, **double-click the HootOwl Dashboard icon** on your desktop. It:
 To stop HootOwl, close those two taskbar windows. If you move the `hootowl` folder, run
 `npm run shortcut` again.
 
+**Automatic updates.** Every time you double-click the shortcut, it checks GitHub for changes
+merged into `main` and downloads them, so you never need to type `git pull` yourself:
+
+- **HootOwl not running:** it updates first, installs any new libraries, then starts.
+- **HootOwl already running:** if there's an update, it asks *"Restart HootOwl now to install
+  it?"* Choose **No** at a busy time. Calls to your clients' numbers don't connect during the
+  ~30-second restart, and you'll be asked again next time.
+- **No internet:** it quietly starts the version you already have.
+- **You edited HootOwl's files yourself:** it skips the update and tells you which files, so your
+  edits are never overwritten.
+
+Database changes are applied automatically when the new version starts. To turn updates off, add
+`HOOTOWL_AUTO_UPDATE=false` to `.env`.
+
 **ngrok (so Twilio can reach your computer).** ngrok gives every free account one **fixed domain**.
 Find it in the ngrok dashboard under **Domains**, e.g. `owl-example.ngrok-free.app`. In `.env` set:
 
