@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>HootOwl Dashboard</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <!-- Sign-in screen -->
+  <main id="signin" class="signin" hidden>
+    <form id="signin-form" class="card signin-card">
+      <div class="brand brand-large"><img class="brand-mark" src="logo.png" alt="" width="56" height="56">HootOwl</div>
+      <h1>Operator dashboard</h1>
+      <p class="muted">Paste your <code>ADMIN_API_KEY</code> from the <code>.env</code> file.</p>
+      <input type="text" name="username" value="hootowl-admin" autocomplete="username" hidden>
+      <label for="signin-key">Admin key</label>
+      <input id="signin-key" name="key" type="password" autocomplete="current-password" required spellcheck="false">
+      <label class="check">
+        <input id="signin-remember" type="checkbox"> Remember on this computer
+      </label>
+      <p id="signin-error" class="form-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+  </main>
+
+  <!-- Signed-in app -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="#overview"><img class="brand-mark" src="logo.png" alt="" width="32" height="32">HootOwl</a>
+        <nav class="tabs" aria-label="Main">
+          <a href="#overview" data-tab="overview">Overview</a>
+          <a href="#inbox" data-tab="inbox">Lead inbox</a>
+          <a href="#clients" data-tab="clients">Clients</a>
+          <a href="#review" data-tab="review">Needs attention <span id="review-count" class="pill" hidden></span></a>
+        </nav>
+        <div class="topbar-actions">
+          <span id="worker-status" class="worker-status" hidden></span>
+          <select id="client-filter" aria-label="Show data for"></select>
+          <button id="signout" type="button" class="btn btn-ghost">Sign out</button>
+        </div>
+      </div>
+    </header>
+    <main id="view" class="container" tabindex="-1"></main>
+  </div>
+
+  <dialog id="dialog"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

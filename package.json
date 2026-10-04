@@ -12,6 +12,7 @@
     "start": "node src/server.js",
     "worker": "node src/worker.js",
     "migrate": "node src/migrate.js",
+    "shortcut": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-desktop-shortcut.ps1",
     "test": "node --test --test-concurrency=1 \"test/*.test.js\""
   },
   "dependencies": {
