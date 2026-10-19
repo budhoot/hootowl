@@ -78,6 +78,8 @@ function isDefiniteRejection(err) {
 // Steps 8-9: send one recovery text and save the result. Returns what happened, or null if the
 // queue is empty.
 export async function processNext({ pool, sendSms, config, logger = console }) {
+  if (!config.smsSendEnabled) return null;
+
   const item = await claimNext(pool, config.worker);
   if (!item) return null;
 

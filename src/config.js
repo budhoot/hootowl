@@ -18,6 +18,14 @@ function number(env, name, fallback) {
   return value;
 }
 
+function boolean(env, name, fallback) {
+  const raw = env[name];
+  if (raw === undefined) return fallback;
+  if (raw.trim().toLowerCase() === 'true') return true;
+  if (raw.trim().toLowerCase() === 'false') return false;
+  throw new Error(`Environment variable ${name} must be "true" or "false", got "${raw}".`);
+}
+
 export function loadConfig(env = process.env) {
   const adminApiKey = required(env, 'ADMIN_API_KEY');
   if (adminApiKey.length < 24) {
@@ -30,6 +38,7 @@ export function loadConfig(env = process.env) {
     // The public https address Twilio uses to reach this API, e.g. https://api.hootowl.net
     publicBaseUrl: required(env, 'PUBLIC_BASE_URL').replace(/\/+$/, ''),
     adminApiKey,
+    smsSendEnabled: boolean(env, 'SMS_SEND_ENABLED', false),
     twilio: {
       accountSid: required(env, 'TWILIO_ACCOUNT_SID'),
       authToken: required(env, 'TWILIO_AUTH_TOKEN'),

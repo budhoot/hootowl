@@ -23,6 +23,9 @@ await migrate(pool);
 // Forget workers that stopped without cleaning up (e.g. the computer was switched off).
 await pool.query(`DELETE FROM worker_heartbeats WHERE last_seen < now() - interval '1 day'`);
 console.log(`Recovery worker started (checking every ${config.worker.pollIntervalMs} ms)`);
+if (!config.smsSendEnabled) {
+  console.log('Outbound recovery SMS is disabled (SMS_SEND_ENABLED=false); queued messages will remain pending.');
+}
 
 while (running) {
   try {

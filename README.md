@@ -8,6 +8,7 @@ Missed-call text-back for HootOwl clients, built with **Node.js + Express**, **T
    call and puts it on the **recovery queue** in PostgreSQL. Answered calls get no text.
 3. The **recovery worker** (a second, separate program) takes queued missed calls and texts the
    caller, e.g. *"Hi, this is Acme Plumbing. Sorry we missed your call! … Book online: … Reply STOP to opt out."*
+   Outbound texts are globally disabled by default; see **Outbound SMS safety switch** below.
    It skips the text when:
    - the client is inactive or recovery is disabled
    - the caller texted **STOP**
@@ -167,6 +168,17 @@ npm run worker                                     # window 3: sends the recover
 
 Then open **http://localhost:3000/dashboard/** in your browser. To stop one, click its window and
 press **Ctrl + C**.
+
+### Outbound SMS safety switch
+
+`SMS_SEND_ENABLED` controls whether the recovery worker may send queued missed-call texts. It
+defaults to `false`; while disabled, the worker remains online but leaves queued texts pending.
+This switch does not disable voice forwarding or inbound SMS webhook handling.
+
+Keep `SMS_SEND_ENABLED=false` for development and testing. Only set it to `true` when you
+intentionally authorize live messages and have completed the applicable registration, consent,
+and opt-out setup. The per-client recovery setting is an additional control, not a replacement
+for this global switch.
 
 ## 7. Point your Twilio number at the API
 

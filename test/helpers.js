@@ -14,6 +14,7 @@ export const config = {
   databaseUrl: TEST_DATABASE_URL,
   publicBaseUrl: 'https://api.example.test',
   adminApiKey: 'test-admin-key-0123456789abcdef',
+  smsSendEnabled: true,
   twilio: { accountSid: 'ACtest', authToken: 'test-auth-token' },
   dialTimeoutSeconds: 20,
   worker: { pollIntervalMs: 10, cooldownHours: 24, stuckSendingMinutes: 10 },
